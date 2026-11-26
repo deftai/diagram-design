@@ -39,6 +39,15 @@ XLINK_NS = "http://www.w3.org/1999/xlink"
 ET.register_namespace("", SVG_NS)
 ET.register_namespace("xlink", XLINK_NS)
 
+DTD_RE = re.compile(r"<!(?:DOCTYPE|ENTITY)\b", re.IGNORECASE)
+
+
+def reject_dtd(text: str) -> None:
+    """Refuse DOCTYPE and ENTITY declarations so no entity is ever expanded."""
+    if DTD_RE.search(text):
+        raise ValueError("SVG input must not contain DOCTYPE or ENTITY declarations")
+
+
 GENERIC_FAMILIES = frozenset(
     {
         "serif",
@@ -404,6 +413,7 @@ def _insert_font_faces(root: ET.Element, rules: list[str]) -> None:
 
 def apply_system_fonts(svg_text: str) -> str:
     """Strip embedded/remote font declarations and write clean fallback font stacks."""
+    reject_dtd(svg_text)
     parser = ET.XMLParser(target=ET.TreeBuilder(insert_comments=True))
     root = ET.fromstring(svg_text, parser=parser)
     _strip_font_css(root)
@@ -430,6 +440,7 @@ def embed_fonts(
     Returns ``(updated_svg_text, report)`` where *report* lists each embedded face.
     """
     cache = cache_dir if cache_dir is not None else default_cache_dir()
+    reject_dtd(svg_text)
     parser = ET.XMLParser(target=ET.TreeBuilder(insert_comments=True))
     root = ET.fromstring(svg_text, parser=parser)
 

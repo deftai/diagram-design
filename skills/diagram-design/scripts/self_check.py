@@ -659,6 +659,9 @@ def check_document_completeness(source: str, errors: list[str], *, is_svg: bool 
         )
 
     if is_svg:
+        if re.search(r"<!(?:DOCTYPE|ENTITY)\b", source, re.IGNORECASE):
+            errors.append("standalone SVG must not contain DOCTYPE or ENTITY declarations")
+            return
         try:
             root = ET.fromstring(source)
         except ET.ParseError as exc:

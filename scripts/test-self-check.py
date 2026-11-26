@@ -522,6 +522,11 @@ def main() -> int:
     check_svg_fail("truncated standalone SVG", svg_source[: len(svg_source) // 2], "does not end with </svg>")
     check_svg_fail("malformed standalone SVG XML", svg_source.replace("</text>", "</tspan>", 1), "not well-formed XML")
     check_svg_fail(
+        "standalone SVG with an ENTITY declaration",
+        svg_source.replace("<svg", '<!DOCTYPE svg [<!ENTITY x SYSTEM "file:///etc/passwd">]>\n<svg', 1),
+        "DOCTYPE or ENTITY",
+    )
+    check_svg_fail(
         "standalone SVG with remote CSS url",
         svg_source.replace("<defs>", "<defs><style>.x { fill: url(https://evil.example/a.png); }</style>", 1),
         "non-fragment CSS url()",

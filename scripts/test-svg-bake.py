@@ -119,6 +119,14 @@ class SvgBakeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.mod.bake_svg(source)
 
+    def test_entity_declaration_rejected(self) -> None:
+        source = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!DOCTYPE x [<!ENTITY e SYSTEM "file:///etc/passwd">]>
+  <text>&e;</text>
+</svg>"""
+        with self.assertRaises(ValueError):
+            self.mod.bake_svg(source)
+
     def test_preserves_font_face_and_spoke_class(self) -> None:
         source = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <defs><style>

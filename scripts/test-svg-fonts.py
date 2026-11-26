@@ -137,6 +137,14 @@ class SvgFontsTests(unittest.TestCase):
         children = [c for c in root if isinstance(c.tag, str)]
         self.assertTrue(children[0].tag.endswith("}title"))
 
+    def test_entity_declaration_rejected(self) -> None:
+        source = (
+            '<!DOCTYPE svg [<!ENTITY e SYSTEM "file:///etc/passwd">]>'
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><text>&e;</text></svg>'
+        )
+        with self.assertRaises(ValueError):
+            self.mod.apply_system_fonts(source)
+
     def test_default_cache_dir_is_outside_repo(self) -> None:
         cache = self.mod.default_cache_dir().resolve()
         self.assertFalse(str(cache).startswith(str(ROOT.resolve())))

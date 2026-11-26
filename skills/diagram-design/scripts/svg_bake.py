@@ -28,6 +28,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+
+DTD_RE = re.compile(r"<!(?:DOCTYPE|ENTITY)\b", re.IGNORECASE)
+
+
+def reject_dtd(text: str) -> None:
+    """Refuse DOCTYPE and ENTITY declarations so no entity is ever expanded."""
+    if DTD_RE.search(text):
+        raise ValueError("SVG input must not contain DOCTYPE or ENTITY declarations")
+
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
@@ -683,6 +692,7 @@ def bake_svg(
     svg_raw = export_svg.ensure_xmlns(svg_raw)
     svg_raw = export_svg.xml_safe_comments(svg_raw)
 
+    reject_dtd(svg_raw)
     parser = ET.XMLParser(target=ET.TreeBuilder(insert_comments=True))
     root = ET.fromstring(svg_raw, parser=parser)
 
@@ -881,6 +891,7 @@ def bake_svg(
 
 def assert_baked(svg: str) -> None:
     """Verify the baked SVG parses as XML and has no var() or class-dependent paint."""
+    reject_dtd(svg)
     try:
         root = ET.fromstring(svg)
     except ET.ParseError as exc:
