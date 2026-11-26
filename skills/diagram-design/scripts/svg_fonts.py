@@ -66,9 +66,10 @@ SYSTEM_STACK_SANS = "'Geist', system-ui, sans-serif"
 SYSTEM_STACK_MONO = "'Geist Mono', ui-monospace, monospace"
 
 GOOGLE_FONTS_CSS2 = "https://fonts.googleapis.com/css2"
-# Minimal UA so Google Fonts returns complete un-sliced TTF files that fontTools
-# can always read and subset (then re-encode to WOFF2 when brotli is installed).
-TTF_USER_AGENT = "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1)"
+# Python-urllib UA causes Google Fonts CSS2 to serve complete un-sliced TTF
+# files that fontTools can always read and subset (then re-encode to WOFF2
+# when brotli is installed).
+TTF_USER_AGENT = "Python-urllib/3.13"
 
 FONT_FACE_BLOCK_RE = re.compile(r"@font-face\s*\{[^{}]*\}", re.IGNORECASE | re.DOTALL)
 IMPORT_RULE_RE = re.compile(r"@import\b[^;]*;", re.IGNORECASE)
