@@ -143,6 +143,48 @@ INHERITED_PROPS = frozenset(
 # Non-visual classes that downstream geometry verifiers read.
 PRESERVED_SEMANTIC_CLASSES = frozenset({"spoke"})
 
+# CSS properties whose effect has no faithful SVG-attribute form here; baking fails loudly.
+UNBAKEABLE_PROPS = ("transform-origin", "transform-box")
+
+CSS_TRANSFORM_FN_RE = re.compile(r"\s*([a-zA-Z]+)\(([^()]*)\)\s*")
+CSS_TRANSFORM_FNS = frozenset({"translate", "translatex", "translatey", "scale", "scalex", "scaley", "rotate", "skewx", "skewy", "matrix"})
+CSS_TRANSFORM_ARG_RE = re.compile(r"^([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)(px|deg)?$", re.IGNORECASE)
+
+
+def css_transform_to_attr(value: str, tag: str) -> str:
+    """Convert a CSS `transform` value to SVG `transform` attribute syntax, or raise."""
+    value = value.strip()
+    if value.lower() == "none":
+        return ""
+    out: list[str] = []
+    pos = 0
+    while pos < len(value):
+        m = CSS_TRANSFORM_FN_RE.match(value, pos)
+        if not m or m.group(1).lower() not in CSS_TRANSFORM_FNS:
+            raise ValueError(f"cannot bake CSS transform {value!r} on <{tag}>")
+        fn = m.group(1).lower()
+        args: list[str] = []
+        for raw in [a.strip() for a in m.group(2).split(",")] if "," in m.group(2) else m.group(2).split():
+            am = CSS_TRANSFORM_ARG_RE.match(raw)
+            if not am:
+                raise ValueError(f"cannot bake CSS transform {value!r} on <{tag}>")
+            args.append(am.group(1))
+        if fn == "translatex":
+            fn, args = "translate", [args[0], "0"]
+        elif fn == "translatey":
+            fn, args = "translate", ["0", args[0]]
+        elif fn == "scalex":
+            fn, args = "scale", [args[0], "1"]
+        elif fn == "scaley":
+            fn, args = "scale", ["1", args[0]]
+        elif fn == "skewx":
+            fn = "skewX"
+        elif fn == "skewy":
+            fn = "skewY"
+        out.append(f"{fn}({' '.join(args)})")
+        pos = m.end()
+    return " ".join(out)
+
 # Tags whose children are metadata/definitions rather than painted graphics.
 NON_GRAPHIC_TAGS = frozenset({"title", "desc", "metadata", "style", "script"})
 
@@ -563,6 +605,7 @@ def _collect_stylesheet_rules(
 ) -> tuple[list[ParsedRule], dict[str, str], dict[str, str], list[str]]:
     """Extract paint/font CSS rules, root tokens, body inherited props, and @font-face blocks."""
     tree = export_svg._html_css_rules(source)
+    standalone_svg = re.search(r"<(?:html|body)\b", source, re.IGNORECASE) is None
     parsed_rules: list[ParsedRule] = []
     root_tokens: dict[str, str] = {}
     body_inherited: dict[str, str] = {}
@@ -602,6 +645,9 @@ def _collect_stylesheet_rules(
                         if name.startswith("--"):
                             root_tokens[name] = val
                         elif low == "body" and name in {"color", "font-family"}:
+                            body_inherited[name] = val
+                        elif low == ":root" and standalone_svg and name in INHERITED_PROPS:
+                            # In a standalone SVG, :root is the <svg> element itself.
                             body_inherited[name] = val
                     continue
                 if low == "svg":
@@ -807,6 +853,16 @@ def bake_svg(
             except ValueError:
                 pass
 
+        for prop in UNBAKEABLE_PROPS:
+            if prop in resolved_css:
+                raise ValueError(f"cannot bake CSS {prop!r} on <{tag}>; write it as an SVG attribute instead")
+        if "transform" in resolved_css:
+            baked_transform = css_transform_to_attr(resolved_css["transform"], tag)
+            if baked_transform:
+                elem.set("transform", baked_transform)
+            else:
+                elem.attrib.pop("transform", None)
+
         # Apply resolved CSS presentation properties as attributes.
         for prop, val in resolved_css.items():
             if prop == "text-transform":
@@ -845,14 +901,6 @@ def bake_svg(
         if "style" in elem.attrib:
             del elem.attrib["style"]
 
-        # Strip purely stylistic class names unless requested to keep them.
-        if not keep_classes and "class" in elem.attrib:
-            kept = [c for c in elem.attrib["class"].split() if c in PRESERVED_SEMANTIC_CLASSES]
-            if kept:
-                elem.set("class", " ".join(kept))
-            else:
-                del elem.attrib["class"]
-
         # Build next inherited property map for children.
         next_inherited = dict(inherited_props)
         for prop in INHERITED_PROPS:
@@ -874,6 +922,18 @@ def bake_svg(
         initial_inherited[prop] = resolve_var(raw_val, root_tokens)
 
     process(root, dict(root_tokens), initial_inherited, 16.0)
+
+    # Strip purely stylistic class names only after every element has been matched,
+    # so descendant selectors such as `.panel .label` still see ancestor classes.
+    if not keep_classes:
+        for elem in root.iter():
+            if _is_comment(elem) or "class" not in elem.attrib:
+                continue
+            kept = [c for c in elem.attrib["class"].split() if c in PRESERVED_SEMANTIC_CLASSES]
+            if kept:
+                elem.set("class", " ".join(kept))
+            else:
+                del elem.attrib["class"]
 
     # Preserve @font-face rules if any existed in the source.
     _insert_font_faces(root, font_faces)

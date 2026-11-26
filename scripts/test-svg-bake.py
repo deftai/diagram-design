@@ -119,6 +119,46 @@ class SvgBakeTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.mod.bake_svg(source)
 
+    def test_descendant_selector_survives_class_stripping(self) -> None:
+        source = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs><style>.label { fill: #2d3142; } .panel .label { fill: #bf4520; }</style></defs>
+  <g class="panel"><text class="label" x="1" y="10">A</text></g>
+  <text class="label" x="1" y="20">B</text>
+</svg>"""
+        root = ET.fromstring(self.mod.bake_svg(source))
+        texts = list(root.iter(f"{SVG_NS}text"))
+        self.assertEqual(texts[0].get("fill"), "#bf4520")
+        self.assertEqual(texts[1].get("fill"), "#2d3142")
+
+    def test_root_declarations_apply_to_standalone_svg(self) -> None:
+        source = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs><style>:root { fill: #bf4520; font-family: Geist; font-size: 20px; }</style></defs>
+  <text x="1" y="20">A</text>
+</svg>"""
+        root = ET.fromstring(self.mod.bake_svg(source))
+        text = next(root.iter(f"{SVG_NS}text"))
+        self.assertEqual(root.get("fill"), "#bf4520")
+        self.assertEqual(root.get("font-size"), "20")
+        self.assertEqual(text.get("font-family"), "Geist")
+
+    def test_css_transform_becomes_attribute(self) -> None:
+        source = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs><style>.shift { transform: translate(40px, 20px) rotate(45deg); }</style></defs>
+  <g class="shift"><rect width="10" height="10"/></g>
+</svg>"""
+        root = ET.fromstring(self.mod.bake_svg(source))
+        group = next(root.iter(f"{SVG_NS}g"))
+        self.assertEqual(group.get("transform"), "translate(40 20) rotate(45)")
+
+    def test_unsupported_css_transform_raises(self) -> None:
+        for css in ("transform: perspective(10px)", "transform: translate(10%, 0)", "transform-origin: center"):
+            source = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs><style>.x {{ {css}; }}</style></defs>
+  <g class="x"><rect width="10" height="10"/></g>
+</svg>"""
+            with self.assertRaises(ValueError, msg=css):
+                self.mod.bake_svg(source)
+
     def test_entity_declaration_rejected(self) -> None:
         source = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <!DOCTYPE x [<!ENTITY e SYSTEM "file:///etc/passwd">]>
