@@ -18,11 +18,11 @@
     {
       "thumb": "architecture.webp",
       "source": "docs/screenshots/architecture.png",
-      "source_sha256": "fe1bd4eaecb3171a9400f2867e9869bb1c797a8deef33dd614b510e2e023cdf8",
+      "source_sha256": "f2d16b91b67245f6e54a57f5d0ee8bb12e9eb7d4919d0bd6aead8ad544ba306c",
       "width": 1400,
-      "height": 673,
+      "height": 706,
       "quality": 90,
-      "thumb_sha256": "ba30cc0dd9de376887ce31e0540a5ed3fd6fc26435699f89bd358dc9809e2479"
+      "thumb_sha256": "a3e048f2b9a55be41df051354860866f1b1b5e73bc0edb0bbf7181c49c2a8942"
     },
     {
       "thumb": "axonometric-plan.webp",

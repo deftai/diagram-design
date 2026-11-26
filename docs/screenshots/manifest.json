@@ -13,12 +13,12 @@
   "entries": [
     {
       "slug": "architecture",
-      "source": "skills/diagram-design/assets/example-architecture.html",
+      "source": "skills/diagram-design/assets/example-architecture.svg",
       "screenshot": "docs/screenshots/architecture.png",
-      "source_sha256": "a9e8b59854d31e70288abba522509494f82a319bc684c3694e08e67dfc990bc5",
-      "screenshot_sha256": "fe1bd4eaecb3171a9400f2867e9869bb1c797a8deef33dd614b510e2e023cdf8",
-      "width": 2400,
-      "height": 1154
+      "source_sha256": "99de7c50f5fd494b728da54c082d3f1f144d5cf406ab1422a30d5ae63c27493c",
+      "screenshot_sha256": "f2d16b91b67245f6e54a57f5d0ee8bb12e9eb7d4919d0bd6aead8ad544ba306c",
+      "width": 2000,
+      "height": 1008
     },
     {
       "slug": "architecture-delta",
