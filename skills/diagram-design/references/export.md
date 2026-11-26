@@ -1,6 +1,29 @@
 # Export to PNG / SVG
 
-Convert a generated diagram HTML file into a portable `.svg` and/or `.png` next to it. **Manual only — never run unprompted.**
+Convert a generated diagram `.svg` or `.html` file into a portable `.svg`, `.png`, and/or `.pdf` next to it. **Manual only - never run unprompted.**
+
+## SVG-native path (converted types)
+
+Converted types (starting with Architecture) are authored directly as standalone `.svg` files with resolved presentation attributes, prefixed IDs, and an in-SVG title/eyebrow top band. They need no HTML extraction step:
+
+- **Bake CSS rules and tokens (if authored with `<style>` or `var()`):**
+  ```
+  python3 scripts/svg_bake.py <src.svg> [<out.svg> | --in-place]
+  ```
+- **Embed subsetted Google Fonts (WOFF2 when `brotli` is available, else TTF) or write fallback stacks:**
+  ```
+  python3 scripts/svg_fonts.py <src.svg> [<out.svg> | --in-place] [--system-fonts]
+  ```
+- **Rasterize directly to PNG (Playwright opens the `.svg` directly):**
+  ```
+  python3 scripts/export_png.py <src.svg> <out.png> [--scale 2]
+  ```
+- **Export directly to vector PDF (Playwright opens the `.svg` directly):**
+  ```
+  python3 scripts/export_pdf.py <src.svg> [<out.pdf>] [--page-size a4|a3|letter]
+  ```
+
+For not-yet-converted `.html` types, follow the legacy HTML procedures below.
 
 ## Trigger
 
@@ -315,8 +338,8 @@ Don't auto-install. The user asked for one feature, not a system change.
 Keep the user's project directory as the working directory so relative input and
 output paths still resolve there. Invoke the packaged renderer by its absolute
 path under the resolved skill directory with the interpreter that passed
-detection: `python3 <skill-dir>/scripts/export_png.py <src.html> <out.png> [scale]`
-or `python <skill-dir>/scripts/export_png.py <src.html> <out.png> [scale]`.
+detection: `python3 <skill-dir>/scripts/export_png.py <src.svg|src.html> <out.png> [--scale N]`
+(positional `[scale]` is also accepted for backwards compatibility) or `python <skill-dir>/scripts/export_png.py <src.svg|src.html> <out.png> [--scale N]`.
 
 If the `networkidle` wait times out (a stalled font or stylesheet behind a proxy), the helper cancels the outstanding load with `window.stop()` and captures with fallback typography, printing a warning to stderr — pass that warning on to the user. Any other error propagates and fails the export normally. The helper requests the complete static motion frame, waits for font readiness, and rejects a motion root that has not reached `data-frame="static"`; ordinary script-free diagrams need no motion root.
 
@@ -335,7 +358,7 @@ Render the original HTML with Playwright Chromium into a single-page vector `.pd
 Invoke the packaged helper by its absolute path under the resolved skill directory:
 
 ```
-python3 <skill-dir>/scripts/export_pdf.py <src.html> [<out.pdf>] [--page-size a4|a3|letter] [--full-page]
+python3 <skill-dir>/scripts/export_pdf.py <src.svg|src.html> [<out.pdf>] [--page-size a4|a3|letter] [--full-page]
 ```
 
 - **Default (exact viewBox bounds, diagram-only):** Requests `?motion=static`, awaits `document.fonts.ready` (with the same 15 s `networkidle` timeout and `window.stop()` stalled-webfont fallback warning as `export_png.py`), verifies `[data-motion-root]` is `data-frame="static"`, keeps screen media colors with `print_background=True` so dark skins retain their palette, isolates the first top-level `<svg>` at 1 CSS px per viewBox unit, and writes a zero-margin single-page vector PDF.
