@@ -223,6 +223,7 @@ DOM_STATE_JS = "() => document.documentElement.outerHTML"
 PAGE_OVERFLOW_JS = """
 () => {
   const doc = document.documentElement;
+  if (!doc || doc.tagName.toLowerCase() === 'svg') return [0, window.innerWidth];
   return [doc.scrollWidth - doc.clientWidth, doc.clientWidth];
 }
 """
@@ -295,7 +296,7 @@ def shipped_assets():
     out of --all was a hole (thanks @greptile). index.html and icons.html are
     galleries of the others, so they add no coverage.
     """
-    patterns = ("example-*.html", "template*.html")
+    patterns = ("example-*.html", "template*.html", "example-*.svg", "template*.svg")
     return sorted({path for pattern in patterns for path in ASSET_DIR.glob(pattern)})
 
 
@@ -740,10 +741,11 @@ def gallery_navigation_failures(context):
                     def serve_gallery(route):
                         name = urlparse(route.request.url).path.removeprefix("/")
                         asset = ASSET_DIR / name
-                        if "/" in name or not name.endswith(".html") or not asset.is_file():
+                        if "/" in name or not name.endswith((".html", ".svg")) or not asset.is_file():
                             route.abort()
                             return
-                        route.fulfill(content_type="text/html", body=asset.read_bytes())
+                        ctype = "image/svg+xml" if name.endswith(".svg") else "text/html"
+                        route.fulfill(content_type=ctype, body=asset.read_bytes())
 
                     page.route("http://gallery.test/*", serve_gallery)
                     url = "http://gallery.test/index.html"
@@ -763,7 +765,7 @@ def gallery_navigation_failures(context):
 
                 phase = "preview-collapse-and-reopen"
                 for attempt in range(3):
-                    page.frame_locator("#preview").locator("body").click(position={"x": 24, "y": 24})
+                    page.frame_locator("#preview").locator("body, svg").first.click(position={"x": 24, "y": 24})
                     expect(nav).to_be_hidden()
                     expect(toggle).to_have_attribute("aria-expanded", "false")
                     assert preview.bounding_box()["height"] > expanded_height, "collapse did not enlarge preview"
@@ -1561,7 +1563,7 @@ def self_test(context):
     with tempfile.TemporaryDirectory() as directory:
         broken_gallery = Path(directory) / "index.html"
         gallery_source = (ASSET_DIR / "index.html").read_text(encoding="utf-8")
-        route_line = "const src = `example-${state.type}${state.variant}.html`;"
+        route_line = "const src = `example-${state.type}${state.variant}.${ext}`;"
         if gallery_source.count(route_line) != 1:
             failures.append("gallery-mobile-routing-fixture: route source changed unexpectedly")
         else:

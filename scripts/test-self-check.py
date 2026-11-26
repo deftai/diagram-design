@@ -13,8 +13,12 @@ ROOT = Path(__file__).resolve().parent.parent
 SELF_CHECK = ROOT / "skills/diagram-design/scripts/self_check.py"
 ASSET_DIR = ROOT / "skills/diagram-design/assets"
 TEMPLATE = ASSET_DIR / "template-motion.html"
+SVG_TEMPLATE = ASSET_DIR / "template.svg"
 EXAMPLE = ASSET_DIR / "example-policy-trace-animated.html"
-STATIC_EXAMPLE = ASSET_DIR / "example-architecture.html"
+STATIC_SVG = ASSET_DIR / "example-architecture.svg"
+STATIC_SVG_DARK = ASSET_DIR / "example-architecture-dark.svg"
+STATIC_SVG_FULL = ASSET_DIR / "example-architecture-full.svg"
+STATIC_HTML_EXAMPLE = ASSET_DIR / "example-flowchart.html"
 
 
 def load_self_check():
@@ -53,10 +57,23 @@ def main() -> int:
             check_pass(label, candidate)
 
     check_pass("shipped template", TEMPLATE)
+    check_pass("shipped SVG template", SVG_TEMPLATE)
     check_pass("shipped animated example", EXAMPLE)
-    check_pass("shipped static example", STATIC_EXAMPLE)
+    check_pass("shipped static HTML example", STATIC_HTML_EXAMPLE)
+    check_pass("shipped static SVG example", STATIC_SVG)
+    check_pass("shipped dark SVG example", STATIC_SVG_DARK)
+    check_pass("shipped full SVG example", STATIC_SVG_FULL)
 
-    static = STATIC_EXAMPLE.read_text(encoding="utf-8")
+    # Wrap the shipped architecture SVG in the HTML shell so every HTML-specific
+    # regression test below keeps its exact fixture anchors.
+    svg_body = re.sub(r"^<\?xml[^?]*\?>\s*", "", STATIC_SVG.read_text(encoding="utf-8"))
+    static = (
+        '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">'
+        "<title>Content site</title>"
+        '<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&display=swap" rel="stylesheet">'
+        "<style>body { margin: 0; }</style></head><body><div class=\"frame\"><p class=\"eyebrow\">Architecture</p>"
+        f"{svg_body}</div></body></html>\n"
+    )
     animated = EXAMPLE.read_text(encoding="utf-8")
 
     # Document completeness: truncation, mojibake and unbalanced markup must all fail.
@@ -305,7 +322,7 @@ def main() -> int:
     )
 
     # Content past the viewBox is clipped silently in the render (#406).
-    clipped_legend = static.replace('viewBox="0 0 1000 480"', 'viewBox="0 0 1000 400"', 1)
+    clipped_legend = static.replace('viewBox="0 0 1000 504"', 'viewBox="0 0 1000 400"', 1)
     check_fail("legend below the viewBox", clipped_legend, "past the viewBox bottom edge")
     for label, markup, needle in (
         ("rect past the right edge", '<rect x="980" y="10" width="40" height="10"/>',
@@ -315,7 +332,7 @@ def main() -> int:
          "past the viewBox top edge"),
         ("line past the left edge", '<line x1="-20" y1="5" x2="10" y2="5"/>',
          "past the viewBox left edge"),
-        ("circle past the bottom edge", '<circle cx="500" cy="478" r="10"/>',
+        ("circle past the bottom edge", '<circle cx="500" cy="502" r="10"/>',
          "past the viewBox bottom edge"),
         ("polygon past the right edge", '<polygon points="990,10 1010,20 990,30"/>',
          "past the viewBox right edge"),
@@ -325,7 +342,7 @@ def main() -> int:
     ):
         check_fail(label, static.replace("</svg>", markup + "</svg>", 1), needle)
     for label, markup in (
-        ("rect on the viewBox edges", '<rect x="0" y="0" width="1000" height="480"/>'),
+        ("rect on the viewBox edges", '<rect x="0" y="0" width="1000" height="504"/>'),
         ("overhang within tolerance", '<rect x="990" y="0" width="12" height="5"/>'),
         ("definitions off-canvas", '<defs><rect x="5000" y="5000" width="1" height="1"/></defs>'),
         ("rotated group", '<g transform="rotate(90)"><rect x="5000" y="0" width="1" height="1"/></g>'),
@@ -362,7 +379,7 @@ def main() -> int:
     check_source_pass("aria-hidden decorative SVG", static.replace("</body>",
         '<svg aria-hidden="true" viewBox="0 0 10 10"><rect x="50" y="50" width="5" height="5"/></svg></body>', 1))
     outside_assets = []
-    for asset in sorted(ASSET_DIR.glob("*.html")):
+    for asset in sorted(set(ASSET_DIR.glob("*.html")) | set(ASSET_DIR.glob("*.svg"))):
         viewbox_errors: list[str] = []
         module.check_viewbox(asset.read_text(encoding="utf-8"), viewbox_errors)
         if viewbox_errors:
@@ -392,7 +409,7 @@ def main() -> int:
                       styled("text.wide { font-size: 4px; }", "").replace(
                           '>Astro Origin</text>', ' class="wide">Astro Origin Server Cluster</text>', 1))
     def fit_svg(body: str, root: str = "") -> str:
-        return re.sub(r"(<svg viewBox=\"0 0 1000 480\"[^>]*)>", r"\1" + root + ">", static, count=1).replace(
+        return re.sub(r"(<svg viewBox=\"0 0 1000 504\"[^>]*)>", r"\1" + root + ">", static, count=1).replace(
             "</svg>", body + "</svg>", 1)
 
     box = '<rect x="0" y="12" width="100" height="40" fill="#ececec" stroke="#2d3142"/>'
@@ -441,7 +458,7 @@ def main() -> int:
                       styled("text.r { direction: rtl; }", box + '<text class="r" x="96" y="32" '
                              'font-size="10">ABCDEFGHIJ</text>'))
     overflowing_assets = []
-    for asset in sorted(ASSET_DIR.glob("*.html")):
+    for asset in sorted(set(ASSET_DIR.glob("*.html")) | set(ASSET_DIR.glob("*.svg"))):
         fit_errors: list[str] = []
         module.check_text_fit(asset.read_text(encoding="utf-8"), fit_errors)
         if fit_errors:
@@ -453,9 +470,9 @@ def main() -> int:
 
     # --offline: system-font output must make no network request, so the one
     # remote stylesheet the default contract allows becomes a failure.
-    if module.verify(STATIC_EXAMPLE, offline=False):
+    if module.verify(STATIC_HTML_EXAMPLE, offline=False):
         failures.append("offline off: the Google Fonts link must still pass by default")
-    offline_errors = module.verify(STATIC_EXAMPLE, offline=True)
+    offline_errors = module.verify(STATIC_HTML_EXAMPLE, offline=True)
     if not any("offline: file loads Google Fonts" in error for error in offline_errors):
         failures.append(f"offline: Google Fonts link not rejected, got {offline_errors}")
     else:
@@ -469,6 +486,51 @@ def main() -> int:
         failures.append(f"offline: a system-font file should pass, got {errors}")
     else:
         print("OK: offline mode passes a file without the font link")
+
+    # Standalone SVG checks (no HTML document assumptions).
+    svg_source = STATIC_SVG.read_text(encoding="utf-8")
+    def check_svg_fail(label: str, source: str, needle: str) -> None:
+        with tempfile.TemporaryDirectory() as scratch:
+            candidate = Path(scratch) / "candidate.svg"
+            candidate.write_text(source, encoding="utf-8")
+            errors = module.verify(candidate)
+        if not any(needle in error for error in errors):
+            failures.append(f"{label}: expected an error containing {needle!r}, got {errors}")
+        else:
+            print(f"OK: {label} rejected")
+
+    def check_svg_pass(label: str, source: str, offline: bool = False) -> None:
+        with tempfile.TemporaryDirectory() as scratch:
+            candidate = Path(scratch) / "candidate.svg"
+            candidate.write_text(source, encoding="utf-8")
+            errors = module.verify(candidate, offline=offline)
+        if errors:
+            failures.append(f"{label}: expected pass, got {errors}")
+        else:
+            print(f"OK: {label} passes")
+
+    check_svg_pass("standalone SVG offline", svg_source, offline=True)
+    check_svg_pass(
+        "standalone SVG with embedded base64 @font-face",
+        svg_source.replace(
+            "<defs>",
+            "<defs><style>@font-face { font-family: 'Geist'; src: url(data:font/ttf;base64,AAAA) format('truetype'); }</style>",
+            1,
+        ),
+        offline=True,
+    )
+    check_svg_fail("truncated standalone SVG", svg_source[: len(svg_source) // 2], "does not end with </svg>")
+    check_svg_fail("malformed standalone SVG XML", svg_source.replace("</text>", "</tspan>", 1), "not well-formed XML")
+    check_svg_fail(
+        "standalone SVG with remote CSS url",
+        svg_source.replace("<defs>", "<defs><style>.x { fill: url(https://evil.example/a.png); }</style>", 1),
+        "non-fragment CSS url()",
+    )
+    check_svg_fail(
+        "standalone SVG with @import",
+        svg_source.replace("<defs>", "<defs><style>@import url('https://fonts.googleapis.com/css2?family=Geist');</style>", 1),
+        "CSS @import",
+    )
 
     if failures:
         for failure in failures:

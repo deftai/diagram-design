@@ -413,8 +413,8 @@ def require_cli_errors(tmp: Path) -> None:
 
 
 def require_diagram_exports(tmp: Path) -> None:
-    # Light diagram (default output path next to copy)
-    light_src = ASSETS / "example-architecture.html"
+    # Light diagram (standalone SVG)
+    light_src = ASSETS / "example-architecture.svg"
     light_out = tmp / "arch-light.pdf"
     r = run_cli(str(light_src), str(light_out))
     if r.returncode != 0:
@@ -424,10 +424,10 @@ def require_diagram_exports(tmp: Path) -> None:
     if len(boxes) != 1:
         raise AssertionError(f"expected single-page exact-bounds PDF, got {len(boxes)} MediaBoxes: {boxes}")
     w_pt, h_pt = boxes[0][2] - boxes[0][0], boxes[0][3] - boxes[0][1]
-    # Parse actual viewBox from example-architecture.html (px * 72/96 -> PDF pt)
+    # Parse actual viewBox from example-architecture.svg (px * 72/96 -> PDF pt)
     vb_match = re.search(r'viewBox="([^"]+)"', light_src.read_text(encoding="utf-8"))
     if not vb_match:
-        raise AssertionError("example-architecture.html missing viewBox")
+        raise AssertionError("example-architecture.svg missing viewBox")
     _, _, vb_w, vb_h = (float(v) for v in vb_match.group(1).split())
     exp_w, exp_h = vb_w * 0.75, vb_h * 0.75
     if not (exp_w - 5 <= w_pt <= exp_w + 5 and exp_h - 5 <= h_pt <= exp_h + 5):
@@ -439,8 +439,8 @@ def require_diagram_exports(tmp: Path) -> None:
         raise AssertionError("light PDF missing vector drawing/text operations")
     print(f"OK: light exact-bounds PDF verified ({w_pt:.0f}x{h_pt:.0f}pt, {len(data)} bytes)")
 
-    # Dark diagram
-    dark_src = ASSETS / "example-architecture-dark.html"
+    # Dark diagram (standalone SVG)
+    dark_src = ASSETS / "example-architecture-dark.svg"
     dark_out = tmp / "arch-dark.pdf"
     r = run_cli(str(dark_src), str(dark_out))
     if r.returncode != 0:
@@ -521,8 +521,8 @@ def require_diagram_exports(tmp: Path) -> None:
         raise AssertionError(f"tall diagram overflowed A4: expected 1 page, got {len(tall_boxes)}")
     print("OK: --page-size a4 fits a 960x720 diagram on one page")
 
-    # Full-page editorial wrapper mode
-    full_src = ASSETS / "example-architecture-full.html"
+    # Full-page editorial wrapper mode (standalone SVG)
+    full_src = ASSETS / "example-architecture-full.svg"
     if full_src.is_file():
         full_out = tmp / "arch-full.pdf"
         r = run_cli("--full-page", str(full_src), str(full_out))

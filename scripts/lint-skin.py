@@ -556,6 +556,13 @@ def named_families(value, allowed_fonts):
     return families
 
 
+DATA_FONT_URL_RE = re.compile(
+    r"^data:(?:font/(?:woff2|woff|ttf|otf|truetype|opentype)|application/font-woff2?);base64,[A-Za-z0-9+/=\s]+$",
+    re.IGNORECASE,
+)
+FONT_FACE_BLOCK_RE = re.compile(r"@font-face\s*\{([^{}]*)\}", re.IGNORECASE | re.DOTALL)
+
+
 def lint_text(
     text, colors, rgb_triplets, expected_slug, allow_template_placeholders=False
 ):
@@ -653,9 +660,16 @@ def lint_text(
     for match in IMPORT_ANY_RE.finditer(text):
         add(match.start(), "external-asset", "CSS @import is not allowed")
 
+    allowed_data_fonts: set[str] = set()
+    for block in FONT_FACE_BLOCK_RE.findall(text):
+        for url_match in URL_ANY_RE.finditer(block):
+            candidate = url_match.group(1).strip().strip("'\"").strip()
+            if DATA_FONT_URL_RE.match(candidate):
+                allowed_data_fonts.add(candidate)
+
     for match in URL_ANY_RE.finditer(text):
         value = match.group(1).strip().strip("'\"").strip()
-        if value.startswith("#"):
+        if value.startswith("#") or value in allowed_data_fonts:
             continue
         add(match.start(), "external-asset", "non-fragment CSS url() is not allowed")
 
@@ -741,6 +755,8 @@ def main():
         paths = sorted(
             set(ASSET_DIR.glob("example-*.html"))
             | set(ASSET_DIR.glob("template*.html"))
+            | set(ASSET_DIR.glob("example-*.svg"))
+            | set(ASSET_DIR.glob("template*.svg"))
         )
         if args.baseline:
             baseline = load_baseline()

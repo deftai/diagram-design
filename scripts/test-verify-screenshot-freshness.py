@@ -258,8 +258,9 @@ def main() -> int:
         unconverted: list[str] = []
         for entry in manifest["entries"]:
             slug = entry["slug"]
-            lf = screenshot_catalog.source_path(slug).read_bytes().replace(b"\r\n", b"\n")
-            copy = crlf_dir / f"example-{slug}.html"
+            src = screenshot_catalog.source_path(slug)
+            lf = src.read_bytes().replace(b"\r\n", b"\n")
+            copy = crlf_dir / src.name
             copy.write_bytes(lf.replace(b"\n", b"\r\n"))
             if screenshot_catalog.sha256(copy) == entry["source_sha256"]:
                 unconverted.append(slug)
@@ -270,7 +271,10 @@ def main() -> int:
         )
         record(
             "committed manifest digests match CRLF copies of the sources",
-            *committed_manifest_check(manifest, lambda slug: crlf_dir / f"example-{slug}.html"),
+            *committed_manifest_check(
+                manifest,
+                lambda slug: crlf_dir / screenshot_catalog.source_path(slug).name,
+            ),
         )
 
     if failures:

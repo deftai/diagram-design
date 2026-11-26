@@ -31,6 +31,9 @@ def canonical_slugs() -> list[str]:
 
 
 def source_path(slug: str) -> Path:
+    svg = ASSET_DIR / f"example-{slug}.svg"
+    if svg.is_file():
+        return svg
     return ASSET_DIR / f"example-{slug}.html"
 
 

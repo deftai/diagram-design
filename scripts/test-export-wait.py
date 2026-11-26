@@ -381,6 +381,25 @@ def require_static_motion_frame(exporter, tmp: Path) -> None:
         raise AssertionError("incomplete motion frame was exported without an error")
     print("OK: motion exports show the complete static frame, repeat identically, and reject incomplete roots")
 
+def require_standalone_svg_scale(tmp: Path) -> None:
+    svg_src = ROOT / "skills/diagram-design/assets/example-architecture.svg"
+    out = tmp / "arch-svg.png"
+    run = subprocess.run(
+        [sys.executable, str(EXPORT_PNG), str(svg_src), str(out), "--scale", "1"],
+        capture_output=True,
+        text=True,
+        timeout=FALLBACK_BUDGET_SECONDS,
+    )
+    if run.returncode != 0:
+        raise AssertionError(f"standalone SVG export failed\n{run.stderr}")
+    require_png(out, "standalone-svg")
+    if png_dimensions(out) != (1000, 504):
+        raise AssertionError(
+            f"standalone SVG export: expected (1000, 504), got {png_dimensions(out)}"
+        )
+    print("OK: standalone SVG opens directly in Playwright and honors --scale")
+
+
 def main() -> int:
     try:
         import playwright  # noqa: F401
@@ -396,6 +415,7 @@ def main() -> int:
         require_normal_load(exporter, tmp)
         require_encoded_paths(exporter, tmp)
         require_fractional_scales(exporter, tmp)
+        require_standalone_svg_scale(tmp)
         require_other_errors_propagate(exporter, tmp)
         require_static_motion_frame(exporter, tmp)
     print("All export-wait cases passed.")

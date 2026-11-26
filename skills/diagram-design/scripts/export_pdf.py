@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export a diagram-design HTML file to a print-ready vector PDF with Playwright."""
+"""Export a diagram-design SVG or HTML file to a print-ready vector PDF with Playwright."""
 
 from __future__ import annotations
 
@@ -44,14 +44,17 @@ def export_pdf(
 
     resolved = src.resolve()
     if resolved.name == "index.html" and resolved.parent.name == "assets":
-        _fail("refusing to export gallery assets/index.html; specify a single diagram HTML file")
+        _fail("refusing to export gallery assets/index.html; specify a single diagram file")
+
+    is_svg = resolved.suffix.casefold() == ".svg"
 
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         try:
             page = browser.new_page()
+            target_url = resolved.as_uri() + ("" if is_svg else "?motion=static")
             page.goto(
-                resolved.as_uri() + "?motion=static",
+                target_url,
                 wait_until="domcontentloaded",
             )
             try:
@@ -88,7 +91,63 @@ def export_pdf(
             if dims is None:
                 _fail("PDF export requires a nonzero finite viewBox on the root <svg>")
 
-            if page_size is not None:
+            svg_doc = is_svg or page.evaluate(
+                "() => document.documentElement.tagName.toLowerCase() === 'svg'"
+            )
+
+            if svg_doc:
+                if page_size is not None:
+                    page.emulate_media(media="print")
+                    sheet_w, sheet_h = PAGE_SIZES[page_size]
+                    page.evaluate(
+                        """({sheetW, sheetH, marginMm}) => {
+                            const svg = document.documentElement;
+                            const px = inches => parseFloat(inches) * 96;
+                            const margin = (marginMm / 25.4) * 96;
+                            const availW = px(sheetW) - 2 * margin;
+                            const availH = px(sheetH) - 2 * margin;
+                            const vb = svg.viewBox.baseVal;
+                            const scale = Math.min(availW / vb.width, availH / vb.height);
+                            const w = Math.floor(vb.width * scale);
+                            const h = Math.floor(vb.height * scale);
+                            svg.style.setProperty('width', `${w}px`, 'important');
+                            svg.style.setProperty('height', `${h}px`, 'important');
+                            svg.style.setProperty('display', 'block', 'important');
+                            svg.style.setProperty('margin', '0 auto', 'important');
+                        }""",
+                        {"sheetW": sheet_w, "sheetH": sheet_h, "marginMm": PAGE_MARGIN_MM},
+                    )
+                    page.pdf(
+                        path=str(out),
+                        width=sheet_w,
+                        height=sheet_h,
+                        print_background=True,
+                        margin={side: f"{PAGE_MARGIN_MM}mm" for side in ("top", "right", "bottom", "left")},
+                    )
+                else:
+                    # Standalone SVG: exact viewBox bounds (full-page SVGs already include
+                    # header, cards, and footer inside the viewBox).
+                    page.emulate_media(media="screen")
+                    page.evaluate(
+                        """({width, height}) => {
+                            const svg = document.documentElement;
+                            for (const [axis, size] of [['width', width], ['height', height]]) {
+                                for (const prefix of ['', 'min-', 'max-']) {
+                                    svg.style.setProperty(prefix + axis, `${size}px`, 'important');
+                                }
+                            }
+                            svg.style.setProperty('display', 'block', 'important');
+                        }""",
+                        dims,
+                    )
+                    page.pdf(
+                        path=str(out),
+                        width=f"{dims['width']}px",
+                        height=f"{dims['height']}px",
+                        print_background=True,
+                        margin={"top": "0", "right": "0", "bottom": "0", "left": "0"},
+                    )
+            elif page_size is not None:
                 page.emulate_media(media="print")
                 if not full_page:
                     sheet_w, sheet_h = PAGE_SIZES[page_size]
@@ -233,7 +292,7 @@ def export_pdf(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("src", type=pathlib.Path, help="diagram HTML input")
+    parser.add_argument("src", type=pathlib.Path, help="diagram SVG or HTML input")
     parser.add_argument("out", nargs="?", type=pathlib.Path, default=None, help="PDF output (default: <src>.pdf)")
     parser.add_argument(
         "--page-size",

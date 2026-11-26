@@ -145,7 +145,7 @@ def read_blobs(root: Path, blobs: list[str]) -> list[bytes]:
 
 def is_gallery_or_ci_variant(name: str) -> bool:
     """Dark, full, and animated examples exist for the gallery and CI."""
-    if not name.startswith("example-") or not name.endswith(".html"):
+    if not name.startswith("example-") or not name.endswith((".html", ".svg")):
         return False
     stem = PurePosixPath(name).stem
     return stem.endswith(("-dark", "-full", "-animated"))
@@ -165,13 +165,13 @@ def include_skill_path(path: str) -> bool:
     if not rest.startswith("assets/"):
         return False
     name = PurePosixPath(rest).name
-    if name.startswith("template") and name.endswith(".html"):
+    if name.startswith("template") and name.endswith((".html", ".svg")):
         return True
     if name == "icons.html":
         return True
     if name == "index.html":
         return False
-    if name.startswith("example-") and name.endswith(".html"):
+    if name.startswith("example-") and name.endswith((".html", ".svg")):
         return not is_gallery_or_ci_variant(name)
     return False
 
