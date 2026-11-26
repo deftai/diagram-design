@@ -1,0 +1,4 @@
+# Pinned dependencies for SVG-native font subsetting (skills/diagram-design/scripts/svg_fonts.py).
+# svg_bake.py uses only the Python standard library.
+# Optional: install brotli for WOFF2 output; without it, svg_fonts.py embeds subsetted TTF.
+fonttools==4.65.0

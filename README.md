@@ -9,6 +9,8 @@
 
 **An agent skill that draws diagrams as one self-contained HTML + SVG file, in your brand.<br>52 diagram types. No shadows. No Mermaid slop.**
 
+*Deft fork of [cathrynlavery/diagram-design](https://github.com/cathrynlavery/diagram-design) (MIT), transitioning diagram authoring to standalone native `.svg` output.*
+
 [![GitHub stars](https://img.shields.io/github/stars/cathrynlavery/diagram-design?style=flat-square&color=bf4520)](https://github.com/cathrynlavery/diagram-design/stargazers)
 [![skills.sh installs](https://skills.sh/b/cathrynlavery/diagram-design?style=flat-square)](https://skills.sh/cathrynlavery/diagram-design/diagram-design)
 [![CI](https://img.shields.io/github/actions/workflow/status/cathrynlavery/diagram-design/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/cathrynlavery/diagram-design/actions/workflows/ci.yml)

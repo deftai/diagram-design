@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Self-check a generated diagram HTML file, with no third-party deps.
+"""Self-check a generated diagram HTML or standalone SVG file, with no third-party deps.
 
 Ships inside the skill so an installed agent can verify its own output:
 
+    python3 <skill-dir>/scripts/self_check.py my-diagram.svg
     python3 <skill-dir>/scripts/self_check.py my-diagram.html
 
 Checks the accessible-SVG contract, the single-file safety rules (no remote
-assets beyond the approved Google Fonts stylesheet, no executable attributes,
-no scripts other than the one canonical motion controller), document
-completeness (a truncated or mojibake file is rejected rather than passed),
-painted content
-staying inside each SVG's viewBox, text inside a visible box staying within
-the style-guide width budget, and — when motion markup is present — the
-structural motion contract. This is a distilled
-subset of the repository gates (`lint-skin.py`, `verify-motion.py`), which
-remain the authority for contributions to the repository itself.
+assets beyond the approved Google Fonts stylesheet in HTML or embedded base64
+fonts in SVG, no executable attributes, no scripts other than the one canonical
+motion controller), document completeness (a truncated, malformed, or mojibake
+file is rejected rather than passed), painted content staying inside each SVG's
+viewBox, text inside a visible box staying within the style-guide width budget,
+and (when motion markup is present) the structural motion contract. This is a
+distilled subset of the repository gates (`lint-skin.py`, `verify-motion.py`),
+which remain the authority for contributions to the repository itself.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ import argparse
 import re
 import sys
 import unicodedata
+import xml.etree.ElementTree as ET
 from collections import Counter
 from html.parser import HTMLParser
 from pathlib import Path
@@ -516,8 +517,35 @@ def normalize_css_escapes(source: str) -> str:
     return CSS_ESCAPE_RE.sub(replace, source)
 
 
-def check_css_references(parser: DiagramParser, errors: list[str]) -> None:
+DATA_FONT_URL_RE = re.compile(
+    r"^data:(?:font/(?:woff2|woff|ttf|otf|truetype|opentype)|application/font-woff2?);base64,[A-Za-z0-9+/=\s]+$",
+    re.IGNORECASE,
+)
+FONT_FACE_BLOCK_RE = re.compile(r"@font-face\s*\{([^{}]*)\}", re.IGNORECASE | re.DOTALL)
+
+
+def is_svg_document(path: Path, source: str) -> bool:
+    """Return True when the input is a standalone SVG file rather than an HTML wrapper."""
+    if path.suffix.casefold() == ".svg":
+        return True
+    head = source.lstrip("\ufeff \t\r\n")
+    if head.startswith("<?xml"):
+        head = re.sub(r"^<\?xml[^?]*\?>\s*", "", head)
+    return head.casefold().startswith("<svg")
+
+
+def check_css_references(parser: DiagramParser, errors: list[str], *, is_svg: bool = False) -> None:
     # Match the repository linter's fail-closed treatment of CSS loader syntax.
+    # Standalone SVG files may carry base64-embedded fonts inside @font-face blocks.
+    raw_styles = "\n".join(parser.styles)
+    allowed_font_urls: set[str] = set()
+    if is_svg:
+        for block in FONT_FACE_BLOCK_RE.findall(normalize_css_escapes(raw_styles)):
+            for match in CSS_URL_RE.finditer(block):
+                val = match.group(1).strip().strip("'\"").strip()
+                if DATA_FONT_URL_RE.match(val):
+                    allowed_font_urls.add(val)
+
     source = normalize_css_escapes("\n".join(parser.styles + parser.css_attributes))
     found_loader = False
     if CSS_IMPORT_RE.search(source):
@@ -525,9 +553,12 @@ def check_css_references(parser: DiagramParser, errors: list[str]) -> None:
         found_loader = True
     for match in CSS_URL_RE.finditer(source):
         value = match.group(1).strip().strip("'\"").strip()
-        if not value.startswith("#"):
-            errors.append("non-fragment CSS url() is not allowed")
-            found_loader = True
+        if value.startswith("#"):
+            continue
+        if is_svg and value in allowed_font_urls:
+            continue
+        errors.append("non-fragment CSS url() is not allowed")
+        found_loader = True
     if CSS_IMAGE_SET_RE.search(source):
         errors.append("CSS image-set() is not allowed")
         found_loader = True
@@ -587,12 +618,12 @@ class BalanceParser(HTMLParser):
         self.closes[tag] += 1
 
 
-def ends_with_shell_close(source: str) -> bool:
-    """True when the last markup in the document is `</html>`.
+def ends_with_shell_close(source: str, *, is_svg: bool = False) -> bool:
+    """True when the last markup in the document is `</html>` (or `</svg>` for SVG).
 
-    HTML allows comments and whitespace after the `</html>` end tag, so stripping only
-    whitespace would reject valid files; a document that really stopped early has no
-    closing tag left once trailing comments are removed.
+    Trailing comments and whitespace after the root end tag are ignored; a
+    document that stopped early has no closing tag left once trailing comments
+    are removed.
     """
     tail = source.rstrip()
     while True:
@@ -603,10 +634,11 @@ def ends_with_shell_close(source: str) -> bool:
         if end < 0 or tail[end + 3 :].strip():
             break
         tail = tail[:start].rstrip()
-    return re.search(r"</html\s*>\Z", tail, re.IGNORECASE) is not None
+    closing = r"</svg\s*>\Z" if is_svg else r"</html\s*>\Z"
+    return re.search(closing, tail, re.IGNORECASE) is not None
 
 
-def check_document_completeness(source: str, errors: list[str]) -> None:
+def check_document_completeness(source: str, errors: list[str], *, is_svg: bool = False) -> None:
     """Reject a document that is not whole: truncation, mojibake, unbalanced markup.
 
     The other checks read a document's contents; none of them notices that the document
@@ -614,8 +646,9 @@ def check_document_completeness(source: str, errors: list[str]) -> None:
     accessible-SVG contract for the part that survived, so this check reads the shape of
     the whole file instead.
     """
-    if not ends_with_shell_close(source):
-        errors.append("document does not end with </html>; the file looks truncated")
+    if not ends_with_shell_close(source, is_svg=is_svg):
+        expected_close = "</svg>" if is_svg else "</html>"
+        errors.append(f"document does not end with {expected_close}; the file looks truncated")
 
     replacements = source.count(REPLACEMENT_CHAR)
     if replacements:
@@ -624,6 +657,21 @@ def check_document_completeness(source: str, errors: list[str]) -> None:
             f"contains {replacements} U+FFFD replacement character(s), first on line {line}:"
             " the file has mojibake or a truncated multi-byte character"
         )
+
+    if is_svg:
+        if re.search(r"<!(?:DOCTYPE|ENTITY)\b", source, re.IGNORECASE):
+            errors.append("standalone SVG must not contain DOCTYPE or ENTITY declarations")
+            return
+        try:
+            root = ET.fromstring(source)
+        except ET.ParseError as exc:
+            errors.append(f"standalone SVG is not well-formed XML: {exc}")
+            return
+        if root.tag != "{http://www.w3.org/2000/svg}svg":
+            errors.append(
+                'standalone SVG root must be <svg xmlns="http://www.w3.org/2000/svg">'
+            )
+        return
 
     parser = BalanceParser()
     parser.feed(source)
@@ -1127,11 +1175,12 @@ def check_motion(parser: DiagramParser, source: str, errors: list[str]) -> None:
 
 def verify(path: Path, offline: bool = False) -> list[str]:
     source = path.read_text(encoding="utf-8")
+    svg_mode = is_svg_document(path, source)
     parser = parsed_document(source)
     errors: list[str] = []
     errors.extend(parser.unsafe)
-    check_document_completeness(source, errors)
-    check_css_references(parser, errors)
+    check_document_completeness(source, errors, is_svg=svg_mode)
+    check_css_references(parser, errors, is_svg=svg_mode)
     for tag, rel, value in parser.references:
         finding = reference_error(tag, rel, value)
         if finding:

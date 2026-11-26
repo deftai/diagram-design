@@ -17,13 +17,15 @@ Infer choices that are clear from the request (for example, "for my deck" implie
 
 | Format | Deliverable | Keeps | Drops |
 |---|---|---|---|
-| `html` | self-contained `.html` (default) | header, diagram, summary cards, footer, live fonts | nothing |
-| `svg` | `.svg` next to the source | the `<svg>` node, vector text | editorial wrapper; fonts substitute in offline tools |
-| `png` | `.png` at `device_scale_factor` | pixels exactly as the browser renders them | vector editability |
+| `svg` | standalone `.svg` (native source for converted types such as Architecture; exported from `.html` for unconverted types) | header band, diagram, optional embedded subsetted fonts, vector text (and SVG summary panels on `-full.svg`) | nothing for SVG-native types; HTML wrapper for legacy HTML exports |
+| `html` | self-contained `.html` (source for not-yet-converted types) | header, diagram, summary cards, footer, live fonts | nothing |
+| `png` | `.png` at `device_scale_factor` (`export_png.py`) | pixels exactly as the browser renders them | vector editability |
 | `pdf` | `.pdf` vector document (`export_pdf.py`) | crisp vector paths, selectable text, dark/light background | live animation controls |
-| `html+png` | both | — | — |
+| `html+png` | both | - | - |
 
-Always generate the HTML first — `svg` and `png` are produced *from* it via [`export.md`](export.md). Never hand-author an SVG file directly; the HTML is the source of truth and the only artifact the taste gate (SKILL.md §9) is written against.
+For SVG-native converted types (starting with Architecture, scaffolded from `assets/template.svg`), author the standalone `.svg` directly as the single source of truth: put the eyebrow and title in the 4px-grid top band inside the `viewBox`, use resolved presentation attributes with no `var()` or class-dependent paint (or bake with `scripts/svg_bake.py`), and optionally embed subsetted fonts with `scripts/svg_fonts.py`. Run `scripts/self_check.py <file>.svg` and `scripts/verify_geometry.py <file>.svg`, and produce `.png` / `.pdf` directly from the `.svg` via [`export.md`](export.md).
+
+For not-yet-converted types, continue to generate the `.html` first and derive `.svg`, `.png`, and `.pdf` via [`export.md`](export.md).
 
 Pick by destination:
 
@@ -265,14 +267,14 @@ Run alongside the SKILL.md §9 taste gate.
 
 - [ ] All four dials set — explicitly requested, inferred from the destination, or defaulted and stated?
 - [ ] `viewBox` matches the size preset exactly, values divisible by 4?
-- [ ] `min-width` equals the preset's viewBox width, and the SVG sits in a local `overflow-x: auto` wrapper (inside any `overflow: hidden` ancestor)?
-- [ ] `@media print` releases `min-width` and `overflow-x`, placed after the `svg` rule?
-- [ ] Type ramp matches the size class — not the standard ramp on a slide?
+- [ ] For standalone `.svg` types: eyebrow and title in the top band on the 4px grid, no `var()`, no class-dependent paint, well-formed XML, and `scripts/self_check.py <file>.svg` passes?
+- [ ] For unconverted `.html` types: `min-width` equals the preset's viewBox width, the SVG sits in a local `overflow-x: auto` wrapper (inside any `overflow: hidden` ancestor), and `@media print` releases both after the `svg` rule?
+- [ ] Type ramp matches the size class (not the standard ramp on a slide)?
 - [ ] 40px outer margin honoured (64px for `social-og`)?
 - [ ] Node count inside the detail level's ceiling?
-- [ ] `faithful` above 9 nodes → zoned, and split above 24?
+- [ ] `faithful` above 9 nodes -> zoned, and split above 24?
 - [ ] Node names, sublabels, and edge labels all at the same audience level?
 - [ ] CJK labels given a font fallback?
 - [ ] Fidelity ledger reported for anything cut?
 - [ ] Diagram `<svg>` has `role="img"`, resolving `aria-labelledby`, a non-empty first-child `<title>`, a non-empty `<desc>`, and per-diagram/variant prefixed IDs?
-- [ ] Requested non-HTML formats produced via [`export.md`](export.md), not hand-authored?
+- [ ] Requested raster/PDF formats produced via [`export.md`](export.md)?

@@ -14,7 +14,9 @@ ROOT = Path(__file__).resolve().parent.parent
 VERIFIER = ROOT / "skills/diagram-design/scripts/verify_geometry.py"
 REPO_ENTRY = ROOT / "scripts/verify-geometry.py"
 ASSET_DIR = ROOT / "skills/diagram-design/assets"
-ARCHITECTURE = ASSET_DIR / "example-architecture.html"
+ARCHITECTURE = ASSET_DIR / "example-architecture.svg"
+ARCHITECTURE_DARK = ASSET_DIR / "example-architecture-dark.svg"
+ARCHITECTURE_FULL = ASSET_DIR / "example-architecture-full.svg"
 SWIMLANE = ASSET_DIR / "example-swimlane.html"
 ZONED = ASSET_DIR / "example-dp-integration.html"
 SEQUENCE_OAUTH = ASSET_DIR / "example-sequence-oauth.html"
@@ -381,7 +383,9 @@ def main() -> int:
         0,
     )
 
-    check_file("shipped architecture example", ARCHITECTURE, 0)
+    check_file("shipped architecture example (SVG)", ARCHITECTURE, 0)
+    check_file("shipped architecture dark example (SVG)", ARCHITECTURE_DARK, 0)
+    check_file("shipped architecture full example (SVG)", ARCHITECTURE_FULL, 0)
     check_file("shipped swimlane example", SWIMLANE, 0)
     check_file("shipped high-level example", HIGH_LEVEL, 0)
     check_file("shipped queue animation", QUEUE_ANIMATED, 0)

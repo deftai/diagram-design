@@ -315,19 +315,41 @@ def gallery_types(source: str) -> list[str]:
     return re.findall(r'data-type="([^"]+)"', source)
 
 
+def gallery_type_exts(source: str) -> dict[str, str]:
+    exts: dict[str, str] = {}
+    for btn in re.finditer(r"<button([^>]+)>", source):
+        attrs = btn.group(1)
+        tm = re.search(r'data-type="([^"]+)"', attrs)
+        if not tm:
+            continue
+        em = re.search(r'data-ext="([^"]+)"', attrs)
+        exts[tm.group(1)] = em.group(1) if em else "html"
+    return exts
+
+
 def check_gallery(errors: list[str]) -> None:
     source = GALLERY.read_text(encoding="utf-8")
     types = gallery_types(source)
     if not types:
         errors.append("gallery has no data-type tabs")
         return
-    reachable = {f"example-{name}{variant}.html" for name in types for variant in VARIANTS}
-    on_disk = {path.name for path in ASSET_DIR.glob("example-*.html")}
+    exts = gallery_type_exts(source)
+    reachable = {
+        f"example-{name}{variant}.{exts.get(name, 'html')}"
+        for name in types
+        for variant in VARIANTS
+    }
+    on_disk = {
+        path.name for path in ASSET_DIR.glob("example-*.html")
+    } | {
+        path.name for path in ASSET_DIR.glob("example-*.svg")
+    }
     for name in sorted(on_disk - reachable):
         errors.append(f"gallery cannot reach shipped example {name}; add a tab to assets/index.html")
     for name in sorted(types):
-        if f"example-{name}.html" not in on_disk:
-            errors.append(f"gallery tab {name!r} points at a missing example-{name}.html")
+        ext = exts.get(name, "html")
+        if f"example-{name}.{ext}" not in on_disk:
+            errors.append(f"gallery tab {name!r} points at a missing example-{name}.{ext}")
     # Parse eyebrow numbers and parent-type bindings from tab buttons.
     # Independent tabs carry a bare number and form a contiguous ascending
     # 01..N sequence in document order. A variant (data-parent-type) carries
@@ -426,8 +448,9 @@ def check_gallery(errors: list[str]) -> None:
     for name in sorted(types):
         if name in single_types:
             continue
+        ext = exts.get(name, "html")
         for variant in ("-dark", "-full"):
-            fname = f"example-{name}{variant}.html"
+            fname = f"example-{name}{variant}.{ext}"
             if fname not in on_disk:
                 errors.append(
                     f"gallery tab {name!r} is missing {fname}; "
@@ -550,7 +573,7 @@ def check_reference_asset_links(
     asset_dir = skill_directory / "assets"
     ref_dir = skill_directory / "references"
     md_paths = [skill_directory / "SKILL.md", *sorted(ref_dir.glob("*.md"))]
-    asset_pattern = re.compile(r"assets/([A-Za-z0-9_.-]+\.html)")
+    asset_pattern = re.compile(r"assets/([A-Za-z0-9_.-]+\.(?:html|svg))")
 
     for path in md_paths:
         if not path.is_file():

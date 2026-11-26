@@ -1,6 +1,29 @@
 # Export to PNG / SVG
 
-Convert a generated diagram HTML file into a portable `.svg` and/or `.png` next to it. **Manual only — never run unprompted.**
+Convert a generated diagram `.svg` or `.html` file into a portable `.svg`, `.png`, and/or `.pdf` next to it. **Manual only - never run unprompted.**
+
+## SVG-native path (converted types)
+
+Converted types (starting with Architecture) are authored directly as standalone `.svg` files with resolved presentation attributes, prefixed IDs, and an in-SVG title/eyebrow top band. They need no HTML extraction step:
+
+- **Bake CSS rules and tokens (if authored with `<style>` or `var()`):**
+  ```
+  python3 scripts/svg_bake.py <src.svg> [<out.svg> | --in-place]
+  ```
+- **Embed subsetted Google Fonts (WOFF2 when `brotli` is available, else TTF) or write fallback stacks:**
+  ```
+  python3 scripts/svg_fonts.py <src.svg> [<out.svg> | --in-place] [--system-fonts]
+  ```
+- **Rasterize directly to PNG (Playwright opens the `.svg` directly):**
+  ```
+  python3 scripts/export_png.py <src.svg> <out.png> [--scale 2]
+  ```
+- **Export directly to vector PDF (Playwright opens the `.svg` directly):**
+  ```
+  python3 scripts/export_pdf.py <src.svg> [<out.pdf>] [--page-size a4|a3|letter]
+  ```
+
+For not-yet-converted `.html` types, follow the legacy HTML procedures below.
 
 ## Trigger
 
@@ -279,7 +302,7 @@ Numeric character references in text and attributes follow HTML decoding, includ
    Channels and alpha are clamped to the CSS ranges 0–255 and 0–1 so out-of-range rgba values retain their browser paint when converted. The `\s*` around each channel tolerates a spaced `rgba(45, 49, 66, 0.03)` as well as the compact `rgba(45,49,66,0.03)` the templates normally use; `\d*\.?\d+` accepts an alpha value with or without a leading zero (both `0.03` and `.03` appear in shipped tokens). Matching is scoped to the `fill="..."` / `stroke="..."` presentation attribute. Class-styled diagrams may still carry `rgba(...)` inside the embedded `<style>` block via custom properties (e.g. `--accent-tint`); that form is correct in browsers and in Figma/Illustrator, and is out of scope for this presentation-attribute pass. (A brand's onboarded palette in `style-guide.md` could in principle add a third notation such as `hsl()`; none exists in any shipped token today, so this pass doesn't handle it — extend the regex if one is ever introduced.)
 8. **Gate:** if the exported SVG still contains `class=` but no diagram CSS rules, stop and fix the CSS carry step — that fragment will render as black boxes. A fonts-only `<style>` (Google Fonts `@import` with no rules) does **not** satisfy the gate.
 9. Prepend `<?xml version="1.0" encoding="UTF-8"?>\n` so the file is well-formed XML.
-10. Write to `<basename>.svg` next to the source (e.g. `example-architecture.html` → `example-architecture.svg`). Honour an explicit output path if the user provides one.
+10. Write to `<basename>.svg` next to the source (e.g. `example-data-flow.html` → `example-data-flow.svg`). Honour an explicit output path if the user provides one.
 
 ### Caveat to surface to the user
 
@@ -315,8 +338,8 @@ Don't auto-install. The user asked for one feature, not a system change.
 Keep the user's project directory as the working directory so relative input and
 output paths still resolve there. Invoke the packaged renderer by its absolute
 path under the resolved skill directory with the interpreter that passed
-detection: `python3 <skill-dir>/scripts/export_png.py <src.html> <out.png> [scale]`
-or `python <skill-dir>/scripts/export_png.py <src.html> <out.png> [scale]`.
+detection: `python3 <skill-dir>/scripts/export_png.py <src.svg|src.html> <out.png> [--scale N]`
+(positional `[scale]` is also accepted for backwards compatibility) or `python <skill-dir>/scripts/export_png.py <src.svg|src.html> <out.png> [--scale N]`.
 
 If the `networkidle` wait times out (a stalled font or stylesheet behind a proxy), the helper cancels the outstanding load with `window.stop()` and captures with fallback typography, printing a warning to stderr — pass that warning on to the user. Any other error propagates and fails the export normally. The helper requests the complete static motion frame, waits for font readiness, and rejects a motion root that has not reached `data-frame="static"`; ordinary script-free diagrams need no motion root.
 
@@ -326,7 +349,7 @@ The helper's overflow release matters for the wide presets. `min-width` equals t
 
 ### Output naming
 
-`example-architecture.html` → `example-architecture.png`, written next to the source. Honour explicit user-provided paths. The rasterizer encodes the absolute source path as a file URI, so literal `#` and `%` characters in filenames remain filename content.
+`example-data-flow.html` → `example-data-flow.png`, written next to the source. Honour explicit user-provided paths. The rasterizer encodes the absolute source path as a file URI, so literal `#` and `%` characters in filenames remain filename content.
 
 ## PDF export procedure
 
@@ -335,7 +358,7 @@ Render the original HTML with Playwright Chromium into a single-page vector `.pd
 Invoke the packaged helper by its absolute path under the resolved skill directory:
 
 ```
-python3 <skill-dir>/scripts/export_pdf.py <src.html> [<out.pdf>] [--page-size a4|a3|letter] [--full-page]
+python3 <skill-dir>/scripts/export_pdf.py <src.svg|src.html> [<out.pdf>] [--page-size a4|a3|letter] [--full-page]
 ```
 
 - **Default (exact viewBox bounds, diagram-only):** Requests `?motion=static`, awaits `document.fonts.ready` (with the same 15 s `networkidle` timeout and `window.stop()` stalled-webfont fallback warning as `export_png.py`), verifies `[data-motion-root]` is `data-frame="static"`, keeps screen media colors with `print_background=True` so dark skins retain their palette, isolates the first top-level `<svg>` at 1 CSS px per viewBox unit, and writes a zero-margin single-page vector PDF.

@@ -1,4 +1,3 @@
-example-architecture-dark.html
 example-data-flow-dark.html
 example-data-flow-full.html
 example-data-flow.html

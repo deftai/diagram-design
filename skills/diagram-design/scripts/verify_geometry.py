@@ -665,13 +665,13 @@ def check(path: Path) -> list[str]:
 
 def targets(args: argparse.Namespace) -> list[Path]:
     if args.all:
-        return sorted(ASSET_DIR.glob("*.html"))
+        return sorted(set(ASSET_DIR.glob("*.html")) | set(ASSET_DIR.glob("*.svg")))
     return [Path(p) for p in args.files]
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("files", nargs="*", help="HTML diagrams to check")
+    parser.add_argument("files", nargs="*", help="HTML or SVG diagrams to check")
     parser.add_argument("--all", action="store_true", help="check every shipped asset")
     args = parser.parse_args()
 

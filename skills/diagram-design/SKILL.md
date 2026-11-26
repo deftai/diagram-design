@@ -289,10 +289,11 @@ Run before producing any diagram.
 
 **Technical:**
 
-- [ ] From the installed skill directory, did `python3 scripts/self_check.py <file>` pass? It covers the accessible-SVG contract (`role="img"`, `aria-labelledby`, `<title>` first, filled and prefixed `<title>` / `<desc>` IDs), single-file safety, document completeness, content inside the viewBox, and motion basics.
+- [ ] From the installed skill directory, did `python3 scripts/self_check.py <file>` pass? It covers the accessible-SVG contract (`role="img"`, `aria-labelledby`, `<title>` first, filled and prefixed `<title>` / `<desc>` IDs), single-file safety, document completeness, content inside the viewBox, and motion basics. Works on both standalone `.svg` and `.html` files.
 - [ ] All six §6 connector rules hold? From the installed skill directory, run `python3 scripts/verify_geometry.py <file>`, then check the rest on the render-and-look PNG (§10).
 - [ ] Arrows drawn before boxes, every arrow label on an opaque `fill="{paper}"` rect, legend as a horizontal bottom strip with ~60px of extra `viewBox`, no vertical `writing-mode` text?
-- [ ] **`min-width` equals the viewBox width, and the SVG sits in a local `overflow-x: auto` wrapper? (Otherwise a phone scrolls the whole page — or an `overflow: hidden` ancestor clips the diagram with no scrollbar at all. See [output-spec.md](references/output-spec.md).)**
+- [ ] For standalone `.svg` types (Architecture and any converted type): no `var()` references and no class-dependent paint (bake with `python3 scripts/svg_bake.py` if authored with CSS classes); eyebrow and title live in the 4px-grid top band inside the `viewBox`.
+- [ ] For not-yet-converted `.html` types: **`min-width` equals the viewBox width, and the SVG sits in a local `overflow-x: auto` wrapper? (Otherwise a phone scrolls the whole page, or an `overflow: hidden` ancestor clips the diagram with no scrollbar at all. See [output-spec.md](references/output-spec.md).)**
 - [ ] Node origins, dimensions, gaps, padding on the 4px grid; type sizes on the role ramp?
 - [ ] If animated, does the complete static/no-JS frame work, does reduced motion hide/disable playback, and is the controller copied verbatim from `assets/template-motion.html`? From a repository checkout, also run `python3 <repo-root>/scripts/verify-motion.py path/to/generated.html` plus the skin linter; from an installed skill, manually check print and static-query states on top of the self-check.
 
@@ -350,7 +351,7 @@ Set these four import decisions **before** drawing. Full spec: [output-spec.md](
 
 | Dial | Options | Default |
 |---|---|---|
-| **Format** | `html` · `svg` · `png` · `html+png` | `html` |
+| **Format** | `svg` · `html` · `png` · `html+png` | `svg` for converted types (Architecture); `html` for remaining types |
 | **Size** | `doc-inline` · `doc-wide` · `slide-16x9` · `slide-4x3` · `social-og` · `social-square` · `print-a4-landscape` · `print-a3-landscape` · `print-letter-landscape` · `fit` | `doc-inline` |
 | **Detail** | `faithful` (≤24 nodes, zoned) · `balanced` (≤12) · `simplified` (≤7) | `balanced` |
 | **Audience** | `engineer` · `mixed` · `executive` — governs wording, not count | `mixed` |
@@ -361,7 +362,13 @@ The size preset sets the `viewBox` **and** the type ramp; `faithful` is the only
 
 ## 12. Output
 
-Always produce a single self-contained `.html` file:
+Converted types (starting with **Architecture**, using `assets/template.svg`) author a single standalone `.svg` file directly:
+
+- Eyebrow and title sit inside the SVG top band on the 4px grid (full-editorial variants render summary cards and footer as SVG `<rect>`/`<text>` panels).
+- All paint and typography use resolved SVG presentation attributes with no `var()` references and no class-dependent paint (`scripts/svg_bake.py` bakes CSS rules and custom properties into presentation attributes when needed).
+- Fonts default to clean fallback stacks or can be subsetted and embedded as base64 `@font-face` rules via `scripts/svg_fonts.py` (`--system-fonts` writes fallback stacks with no embedded font data).
+
+Not-yet-converted types continue to produce a single self-contained `.html` file during migration:
 
 - Embedded CSS (no external except Google Fonts)
 - Inline SVG (no external images)
@@ -375,13 +382,13 @@ Every diagram is an accessible figure by default (long form: [primitives-core.md
 
 1. `<svg>` carries `role="img"` and `aria-labelledby` naming its `<title>` and `<desc>`.
 2. `<title>` is the first child of `<svg>`, before `<defs>`.
-3. IDs are `<slug>-title` / `<slug>-desc`, the slug matching the file (`loop`, `loop-dark`, `loop-full`); never bare `title` / `desc`.
-4. `<title>` is the subject's short name, roughly the page `<h1>`, 60 characters or fewer.
+3. IDs are `<slug>-title` / `<slug>-desc`, the slug matching the file (`architecture`, `architecture-dark`, `architecture-full`); never bare `title` / `desc`.
+4. `<title>` is the subject's short name, roughly the page `<h1>` or SVG top-band title, 60 characters or fewer.
 5. `<desc>` is one sentence about the content, not the geometry.
 6. Decorative-only SVG, such as the glyphs in `assets/icons.html`, carries `aria-hidden="true"` instead.
 
 ### Exporting to PNG / SVG / PDF
 
-When the user asks to export, save, rasterize, or convert a generated diagram to `.png`, `.svg`, or `.pdf`, load [`references/export.md`](references/export.md) and follow the procedure there. Run the packaged helpers `scripts/export_svg.py`, `scripts/export_png.py`, and `scripts/export_pdf.py`; the reference owns their arguments and availability checks. All three formats deliver the diagram only (the `<svg>` node) by default — editorial wrappers like cards and headers are dropped unless `--full-page` is requested for PDF. Export is **manual** — never produce export files unprompted. The scratch preview from the render-and-look step (§10) is not an export: it stays in a temporary folder.
+When the user asks to export, save, rasterize, or convert a generated diagram to `.png`, `.svg`, or `.pdf`, load [`references/export.md`](references/export.md) and follow the procedure there. Run the packaged helpers `scripts/export_png.py`, `scripts/export_pdf.py`, and (for legacy `.html` sources) `scripts/export_svg.py`; for standalone `.svg` sources, use `scripts/svg_bake.py` to bake CSS rules and `scripts/svg_fonts.py` to embed subsetted fonts. `export_png.py` and `export_pdf.py` open standalone `.svg` files directly in Playwright as well as legacy `.html` files. Export is **manual** - never produce export files unprompted. The scratch preview from the render-and-look step (§10) is not an export: it stays in a temporary folder.
 
 For an imported diagram, pixel dimensions come from the `viewBox` × scale factor, so its size decision belongs to §11, not to export. For any diagram that needs an exact frame (an OG card or a slide image), see [`export.md` § Sizing the export](references/export.md).

@@ -757,18 +757,18 @@ class ExportSvgStandaloneTests(unittest.TestCase):
         self.assertIn('url(other.svg#paint)', result)
 
     def test_light_and_dark_architecture_do_not_collide_when_inlined(self) -> None:
-        light_src = ASSETS / "example-architecture.html"
-        dark_src = ASSETS / "example-architecture-dark.html"
+        light_src = ASSETS / "example-flowchart.html"
+        dark_src = ASSETS / "example-flowchart-dark.html"
         light = self.mod.export_svg_document(light_src.read_text(encoding="utf-8"), light_src)
         dark = self.mod.export_svg_document(dark_src.read_text(encoding="utf-8"), dark_src)
         combined = light + "\n" + dark
-        self.assertEqual(combined.count('id="example-architecture-arrow"'), 1)
-        self.assertEqual(combined.count('id="example-architecture-dark-arrow"'), 1)
-        self.assertIn("url(#example-architecture-arrow)", light)
-        self.assertIn("url(#example-architecture-dark-arrow)", dark)
+        self.assertEqual(combined.count('id="example-flowchart-arrow"'), 1)
+        self.assertEqual(combined.count('id="example-flowchart-dark-arrow"'), 1)
+        self.assertIn("url(#example-flowchart-arrow)", light)
+        self.assertIn("url(#example-flowchart-dark-arrow)", dark)
         # Distinct root scopes so token sheets do not overwrite each other.
-        self.assertIn('id="example-architecture-root"', light)
-        self.assertIn('id="example-architecture-dark-root"', dark)
+        self.assertIn('id="example-flowchart-root"', light)
+        self.assertIn('id="example-flowchart-dark-root"', dark)
 
     def test_class_without_style_gate(self) -> None:
         html = """<!DOCTYPE html><html><body>

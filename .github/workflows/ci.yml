@@ -318,6 +318,16 @@ jobs:
         id: export_svg
         run: python scripts/test-export-svg-standalone.py
 
+      - name: Verify SVG style baking
+        if: always()
+        id: svg_bake
+        run: python scripts/test-svg-bake.py
+
+      - name: Verify SVG font subsetting and embedding
+        if: always() && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        id: svg_fonts
+        run: uv run --locked --project .github/ci/python python scripts/test-svg-fonts.py
+
       - name: Verify label geometry
         if: always()
         id: geometry
@@ -713,6 +723,8 @@ jobs:
           echo "| README Thumbnail Freshness | ${{ steps.readme_thumbs.outcome == 'success' && '✅ Passed' || (steps.readme_thumbs.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Packaged Self-Check | ${{ steps.self_check.outcome == 'success' && '✅ Passed' || (steps.self_check.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Standalone SVG Export | ${{ steps.export_svg.outcome == 'success' && '✅ Passed' || (steps.export_svg.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| SVG Style Baking | ${{ steps.svg_bake.outcome == 'success' && '✅ Passed' || (steps.svg_bake.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| SVG Font Embedding | ${{ steps.svg_fonts.outcome == 'success' && '✅ Passed' || (steps.svg_fonts.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Label Geometry | ${{ steps.geometry.outcome == 'success' && '✅ Passed' || (steps.geometry.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Label Geometry Checker | ${{ steps.geometry_tests.outcome == 'success' && '✅ Passed' || (steps.geometry_tests.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Block Registry | ${{ steps.block_registry.outcome == 'success' && '✅ Passed' || (steps.block_registry.outcome == 'skipped' && '⏭️ Skipped' || '❌ Failed') }} |" >> "$GITHUB_STEP_SUMMARY"

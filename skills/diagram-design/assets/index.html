@@ -282,7 +282,7 @@
           <span class="catalog-hint">Click the preview to hide navigation</span>
         </div>
       <div class="tabs" id="type-tabs" role="radiogroup" aria-label="Diagram type">
-        <button class="tab active" data-type="architecture">
+        <button class="tab active" data-type="architecture" data-ext="svg">
           <span class="eyebrow">01</span>Architecture
         </button>
         <button class="tab" data-type="datalake" data-parent-type="architecture">
@@ -561,7 +561,7 @@
     <main>
       <iframe
         id="preview"
-        src="example-architecture.html"
+        src="example-architecture.svg"
         title="Preview"
       ></iframe>
     </main>
@@ -653,7 +653,8 @@
             tab.tabIndex = active ? 0 : -1;
           });
         }
-        const src = `example-${state.type}${state.variant}.html`;
+        const ext = (activeType && activeType.dataset.ext) || "html";
+        const src = `example-${state.type}${state.variant}.${ext}`;
         iframe.src = src;
         openRaw.href = src;
         filterDiagrams();

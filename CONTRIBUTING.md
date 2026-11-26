@@ -203,6 +203,8 @@ python3 scripts/test-plugin-package.py \
   && python3 scripts/verify-contrast.py \
   && python3 scripts/test-self-check.py \
   && python3 scripts/test-export-svg-standalone.py \
+  && python3 scripts/test-svg-bake.py \
+  && python3 scripts/test-svg-fonts.py \
   && python3 scripts/verify-geometry.py --all \
   && python3 scripts/test-verify-geometry.py \
   && python3 scripts/verify-architecture-delta.py --all \

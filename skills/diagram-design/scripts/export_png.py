@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rasterize the first SVG in a diagram HTML file with Playwright."""
+"""Rasterize a diagram SVG or HTML file with Playwright."""
 
 from __future__ import annotations
 
@@ -32,12 +32,14 @@ def rasterize(
     network_idle_timeout_ms: int = NETWORK_IDLE_TIMEOUT_MS,
     fallback_settle_ms: int = FALLBACK_SETTLE_MS,
 ) -> None:
+    is_svg = src.suffix.casefold() == ".svg"
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         try:
             page = browser.new_page(device_scale_factor=scale)
+            target_url = src.resolve().as_uri() + ("" if is_svg else "?motion=static")
             page.goto(
-                src.resolve().as_uri() + "?motion=static",
+                target_url,
                 wait_until="domcontentloaded",
             )
             try:
@@ -59,7 +61,7 @@ def rasterize(
                 raise RuntimeError("motion export requires a complete static frame")
             svg = page.locator("svg").first
             # Capture at one CSS pixel per viewBox unit before applying the multiplier.
-            svg.evaluate(
+            dims = svg.evaluate(
                 """el => {
                     const box = el.viewBox.baseVal;
                     if (![box.width, box.height].every(n => Number.isFinite(n) && n > 0))
@@ -67,13 +69,17 @@ def rasterize(
                     for (const [axis, size] of [['width', box.width], ['height', box.height]])
                         for (const prefix of ['', 'min-', 'max-'])
                             el.style.setProperty(prefix + axis, size + 'px', 'important');
+                    return { width: Math.ceil(box.width), height: Math.ceil(box.height) };
                 }"""
             )
-            # Release every clipping ancestor so a wide SVG is captured whole.
-            svg.evaluate(
-                "el => { for (let a = el.parentElement; a; a = a.parentElement) "
-                "a.style.setProperty('overflow', 'visible', 'important'); }"
-            )
+            if is_svg or page.evaluate("() => document.documentElement.tagName.toLowerCase() === 'svg'"):
+                page.set_viewport_size({"width": dims["width"], "height": dims["height"]})
+            else:
+                # Release every clipping ancestor so a wide SVG is captured whole.
+                svg.evaluate(
+                    "el => { for (let a = el.parentElement; a; a = a.parentElement) "
+                    "a.style.setProperty('overflow', 'visible', 'important'); }"
+                )
             svg.screenshot(path=out, omit_background=True)
         finally:
             browser.close()
@@ -81,11 +87,19 @@ def rasterize(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("src", type=pathlib.Path, help="diagram HTML input")
+    parser.add_argument("src", type=pathlib.Path, help="diagram SVG or HTML input")
     parser.add_argument("out", type=pathlib.Path, help="PNG output")
-    parser.add_argument("scale", nargs="?", type=exact_size_scale, default=2)
+    parser.add_argument("scale", nargs="?", type=exact_size_scale, default=None)
+    parser.add_argument(
+        "--scale",
+        dest="scale_flag",
+        type=exact_size_scale,
+        default=None,
+        help="device scale factor between 1 and 4 (default: 2)",
+    )
     args = parser.parse_args()
-    rasterize(args.src, args.out, args.scale)
+    scale = args.scale_flag if args.scale_flag is not None else (args.scale if args.scale is not None else 2)
+    rasterize(args.src, args.out, scale)
     return 0
 
 
